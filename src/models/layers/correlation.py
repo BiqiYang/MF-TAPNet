@@ -34,75 +34,7 @@ kernel_Correlation_rearrange = '''
 	}
 '''
 
-kernel_Correlation_updateOutput = '''
-	extern "C" __global__ void kernel_Correlation_updateOutput(
-	  const int n,
-	  const float* rbot0,
-	  const float* rbot1,
-	  float* top
-	) {
-	  extern __shared__ char patch_data_char[];
-	  
-	  float *patch_data = (float *)patch_data_char;
-	  
-	  // First (upper left) position of kernel upper-left corner in current center position of neighborhood in image 1
-	  int x1 = blockIdx.x + 20;
-	  int y1 = blockIdx.y + 20;
-	  int item = blockIdx.z;
-	  int ch_off = threadIdx.x;
-	  
-	  // Load 3D patch into shared shared memory
-	  for (int j = 0; j < 1; j++) { // HEIGHT
-	    for (int i = 0; i < 1; i++) { // WIDTH
-	      int ji_off = ((j * 1) + i) * SIZE_3(rbot0);
-	      for (int ch = ch_off; ch < SIZE_3(rbot0); ch += 32) { // CHANNELS
-	        int idx1 = ((item * SIZE_1(rbot0) + y1+j) * SIZE_2(rbot0) + x1+i) * SIZE_3(rbot0) + ch;
-	        int idxPatchData = ji_off + ch;
-	        patch_data[idxPatchData] = rbot0[idx1];
-	      }
-	    }
-	  }
-	  
-	  __syncthreads();
-	  
-	  __shared__ float sum[32];
-	  
-	  // Compute correlation
-	  for (int top_channel = 0; top_channel < SIZE_1(top); top_channel++) {
-	    sum[ch_off] = 0;
-	  
-	    int s2o = (top_channel % 21 - 10) * 2;
-	    int s2p = (top_channel / 21 - 10) * 2;
-	    
-	    for (int j = 0; j < 1; j++) { // HEIGHT
-	      for (int i = 0; i < 1; i++) { // WIDTH
-	        int ji_off = ((j * 1) + i) * SIZE_3(rbot0);
-	        for (int ch = ch_off; ch < SIZE_3(rbot0); ch += 32) { // CHANNELS
-	          int x2 = x1 + s2o;
-	          int y2 = y1 + s2p;
-	          
-	          int idxPatchData = ji_off + ch;
-	          int idx2 = ((item * SIZE_1(rbot0) + y2+j) * SIZE_2(rbot0) + x2+i) * SIZE_3(rbot0) + ch;
-	          
-	          sum[ch_off] += patch_data[idxPatchData] * rbot1[idx2];
-	        }
-	      }
-	    }
-	    
-	    __syncthreads();
-	    
-	    if (ch_off == 0) {
-	      float total_sum = 0;
-	      for (int idx = 0; idx < 32; idx++) {
-	        total_sum += sum[idx];
-	      }
-	      const int sumelems = SIZE_3(rbot0);
-	      const int index = ((top_channel*SIZE_2(top) + blockIdx.y)*SIZE_3(top))+blockIdx.x;
-	      top[index + item*SIZE_1(top)*SIZE_2(top)*SIZE_3(top)] = total_sum / (float)sumelems;
-	    }
-	  }
-	}
-'''
+kernel_Correlation_updateOutput = 
 
 kernel_Correlation_updateGradFirst = '''
 	#define ROUND_OFF 50000
